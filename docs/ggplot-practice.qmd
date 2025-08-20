@@ -1,6 +1,8 @@
 ---
 title: "ggplot-practice"
 format: html
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r}
@@ -8,6 +10,7 @@ format: html
 library(tidyverse)
 library(here)
 library(janitor)
+library(paletteer)
 ```
 
 ## Ggplot basics
@@ -98,8 +101,115 @@ lizard_counts <- lizards %>%
 ggplot(data = lizard_counts,
        aes(x = n, y = fct_reorder(common_name, n))) +
   geom_col() +
-  labs(x = "Individuals",
+  labs(x = "Individuals (n)",
        y = "Species Common Name")
+```
 
+## Advanced ggplot customization
+
+```{r}
+ggplot(lizards, aes(x = total_length, 
+                    y = weight)) +
+  geom_point() +
+  scale_x_continuous(breaks = c(0, 250, 500),
+                     limits = c(0, 500)) +
+  scale_y_continuous(breaks = seq(from = 0,
+                                  to = 70,
+                                  by = 10),
+                     limits = c(0, 70)) +
+  labs(x = "Total length (cm)",
+       y = "Weight (g)") + 
+  theme_minimal() 
+  
+```
+
+You can convert to a log scale:
+```{r}
+ggplot(lizards, aes(x = total_length, 
+                    y = weight)) +
+  geom_point() +
+  scale_x_log10()
+```
+
+#count the number of lizards caught per day
+```{r}
+lizard_counts <- lizards %>%  
+  mutate(date = lubridate::mdy(date)) %>% 
+  count(date) 
+
+ggplot(lizard_counts, 
+       aes(x = date, y = n)) + geom_line() +
+  scale_x_date(breaks = scales::breaks_width("2 years"),
+               labels = scales::label_date("%Y"))
+```
+
+### Customization aesthetics with `scale_` functions
+```{r}
+# color gradient with two colors
+ggplot(lizards, 
+       aes(x = total_length, y = weight)) + 
+  geom_point(aes(color = weight)) +
+  scale_color_gradient(low = "red", high = "navy")
+
+# '' with more than 2 colors
+ggplot(lizards, 
+       aes(x = total_length, y = weight)) + 
+  geom_point(aes(color = weight)) +
+  scale_color_gradientn(colors = c("orange", "red", "purple", "navy",
+                                   "black"))
+
+#create a gradient of color bins
+ggplot(lizards, 
+       aes(x = total_length, y = weight)) + 
+  geom_point(aes(color = weight)) +
+  scale_color_steps(low = "red", high = "navy",
+                    breaks = seq(0, 80, by = 5))
+```
+
+```{r}
+ggplot(lizards, 
+       aes(x = common_name, y = total_length)) + 
+  geom_boxplot(aes(fill = common_name), 
+               show.legend = FALSE) + coord_flip()
+```
+
+```{r}
+lizards_mean <- lizards %>% 
+  mutate(common_name = fct_reorder(common_name, total_length, 
+                                    .fun = median))
+
+ggplot(data = lizards_mean, aes(y = common_name, x = total_length)) +
+  geom_boxplot(aes(fill = common_name), show.legend = FALSE) +
+  scale_x_continuous(limits = c(0, 500)) +
+  scale_fill_paletteer_d(palette = "ggsci::default_gsea") + #discrete data `(d)`
+  labs(y = "Lizard species",
+       x = "Total length (mm)") +
+  theme_minimal() + #add before updating graph specifics
+  theme(panel.grid.minor = element_blank()) #remove minor grid lines
+```
+
+# Working with the patchwork package to create compound figures
+
+```{r}
+library(patchwork)
+
+p <- ggplot(lizards, aes(x = total_length)) + 
+  geom_histogram()
+
+q <- ggplot(data = lizards, aes(x = total_length, y = weight)) +
+  geom_point(aes(color = common_name),
+             alpha = 0.3)
+```
+
+```{r}
+#Puts plots next to each other
+(p | q) & theme_minimal()
+
+#Puts plots on top of each other
+(p / q / q / q)
+
+plot_test <- ((p | q) / q) #combination of next to and on top of each other
+
+ggsave(here::here("figs", "plot_test.png"), plot_test)
 ```
 
